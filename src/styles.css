@@ -106,9 +106,12 @@ body {
     padding: 6px 6px 6px 15px;
     border-radius: 999px;
     will-change: width;
-    /* 宽度跟导航同一条曲线同一个时长补间，旋转时一起收/展 */
+    /* 宽度/位置跟导航同一条曲线同一个时长补间，旋转时一起收/展、滑动 */
     transition:
         width var(--dur-layout) var(--ease-ios),
+        margin-top var(--dur-layout) var(--ease-ios),
+        margin-left var(--dur-layout) var(--ease-ios),
+        margin-bottom var(--dur-layout) var(--ease-ios),
         box-shadow 0.3s ease,
         border-color 0.3s ease;
 }
@@ -272,6 +275,20 @@ body {
         padding-bottom: 28px;
     }
     .app.has-player .page { padding-bottom: 108px; }
+
+    /* 搜索框上移，与「搜索」标题同一行、贴在标题右侧（Sage 红框标注）。
+       用负 margin 把它从标题下方拉回标题行，仍保留 sticky 悬浮；
+       宽度同步补间，旋转时它从标题下方滑上标题右侧。 */
+    .searchbar {
+        width: min(210px, calc(100% - 200px));
+        margin-top: -41px;
+        margin-left: 74px;
+        margin-bottom: 20px;
+        /* 横屏标题旁的版本要更小更细：压低内边距与按钮 */
+        padding: 4px 4px 4px 12px;
+    }
+    .searchbar .search-icon { width: 17px; height: 17px; }
+    .searchbar button { padding: 6px 13px; font-size: 14px; }
 
     .miniplayer {
         --mp-w: min(520px, calc(100vw - 150px));
