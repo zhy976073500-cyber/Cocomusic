@@ -11,7 +11,10 @@
     --bar-h: 64px;
     --mp-w: min(520px, calc(100vw - 32px));
     --mp-h: 60px;
-    --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+    /* 全局布局过渡统一用这条曲线 + 时长：easeOutQuint 式的丝滑减速，
+       旋转时导航、播放器、搜索框、内容边距同曲线同拍一起动，不互相追赶。 */
+    --ease-ios: cubic-bezier(0.22, 1, 0.36, 1);
+    --dur-layout: 0.7s;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -66,6 +69,11 @@ body {
     /* 内容从悬浮件下面滚过，玻璃的模糊才看得出来 */
     padding-left: calc(20px + env(safe-area-inset-left));
     padding-right: calc(20px + env(safe-area-inset-right));
+    /* 横竖屏切换时边距也跟着补间，内容是「滑」过去的而不是跳过去的 */
+    transition:
+        padding-right var(--dur-layout) var(--ease-ios),
+        padding-bottom var(--dur-layout) var(--ease-ios),
+        padding-left var(--dur-layout) var(--ease-ios);
 }
 
 .app.has-player .page {
@@ -90,10 +98,19 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    /* 缩小成紧凑胶囊，靠左放在标题下方（Sage 2026-10-25 红框标注的位置）。
+       竖屏内容区本身只有约 350px，这个宽度看起来仍近乎全宽；
+       横屏时就明显收成左上角一颗，不再横贯整个屏幕。 */
+    width: min(360px, 100%);
     margin: 16px 0 18px;
     padding: 6px 6px 6px 15px;
     border-radius: 999px;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    will-change: width;
+    /* 宽度跟导航同一条曲线同一个时长补间，旋转时一起收/展 */
+    transition:
+        width var(--dur-layout) var(--ease-ios),
+        box-shadow 0.3s ease,
+        border-color 0.3s ease;
 }
 .searchbar:focus-within {
     border-color: rgba(255, 255, 255, 0.95);
@@ -156,11 +173,12 @@ body {
     top: calc(100dvh - var(--mp-h) - var(--bar-h) - 24px - env(safe-area-inset-bottom));
     padding: 7px 10px 7px 7px;
     border-radius: 26px;
+    will-change: left, top, width, height;
     transition:
-        left 0.6s var(--ease-ios),
-        top 0.6s var(--ease-ios),
-        width 0.6s var(--ease-ios),
-        height 0.6s var(--ease-ios);
+        left var(--dur-layout) var(--ease-ios),
+        top var(--dur-layout) var(--ease-ios),
+        width var(--dur-layout) var(--ease-ios),
+        height var(--dur-layout) var(--ease-ios);
 }
 .miniplayer img { width: 46px; height: 46px; border-radius: 17px; object-fit: cover; background: var(--line); flex: none; }
 .miniplayer .meta { flex: 1; min-width: 0; }
@@ -197,12 +215,13 @@ body {
     top: calc(100dvh - var(--bar-h) - 14px - env(safe-area-inset-bottom));
     padding: 6px;
     border-radius: 999px;
+    will-change: left, top, width, height;
     /* 旋转设备时，位置与尺寸一起补间，整条导航滑过去而不是跳过去 */
     transition:
-        left 0.6s var(--ease-ios),
-        top 0.6s var(--ease-ios),
-        width 0.6s var(--ease-ios),
-        height 0.6s var(--ease-ios);
+        left var(--dur-layout) var(--ease-ios),
+        top var(--dur-layout) var(--ease-ios),
+        width var(--dur-layout) var(--ease-ios),
+        height var(--dur-layout) var(--ease-ios);
 }
 .tabbar button {
     flex: 1 1 0;
