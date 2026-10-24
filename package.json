@@ -20,7 +20,8 @@
     "build": "tsc --noEmit && vite build",
     "dev": "vite",
     "preview": "vite preview",
-    "postinstall": "node scripts/patch-cap-cli-spm.mjs"
+    "postinstall": "node scripts/patch-cap-cli-spm.mjs",
+    "capacitor:sync:after": "node scripts/patch-ios-orientations.mjs"
   },
   "type": "module",
   "version": "0.1.0"

@@ -4,6 +4,14 @@
     --sub: #8a8a8e;
     --line: #eeeeee;
     --accent: #111111;
+    /* 悬浮导航的尺寸：竖屏是底部横胶囊，横屏是右侧竖胶囊。
+       位置全部用 left/top/width/height 的数值 calc 表达，
+       这样旋转时这几个属性可以被 transition 平滑插值，导航会「滑」到右侧。 */
+    --bar-w: 344px;
+    --bar-h: 64px;
+    --mp-w: min(520px, calc(100vw - 32px));
+    --mp-h: 60px;
+    --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,9 +20,36 @@ html, body, #root { height: 100%; }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
-    background: var(--bg);
+    background: linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- 液态玻璃 ----------
+   WKWebView 没有原生 Liquid Glass，Web 层用这套配方逼近：
+   高斯模糊 + 饱和度提升（backdrop-filter）、半透明渐变本体、
+   顶部高光内阴影 + 边缘亮线（border）模拟玻璃折射与镜面反射。
+   不支持 backdrop-filter 的环境走 @supports 兜底为近乎不透明的浅色，
+   保证文字可读（能力审计：先探测、再给兜底）。 */
+.glass {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0) 55%),
+        linear-gradient(155deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.28) 42%, rgba(255, 255, 255, 0.38) 78%, rgba(255, 255, 255, 0.5));
+    -webkit-backdrop-filter: blur(22px) saturate(185%);
+    backdrop-filter: blur(22px) saturate(185%);
+    border: 1px solid rgba(255, 255, 255, 0.68);
+    box-shadow:
+        0 14px 34px rgba(15, 23, 42, 0.13),
+        0 3px 10px rgba(15, 23, 42, 0.07),
+        inset 0 1px 1px rgba(255, 255, 255, 0.95),
+        inset 0 -1px 1px rgba(255, 255, 255, 0.28),
+        inset 1px 0 1px rgba(255, 255, 255, 0.35),
+        inset -1px 0 1px rgba(255, 255, 255, 0.2);
+}
+
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .glass { background: rgba(247, 247, 249, 0.96); }
 }
 
 .app {
@@ -27,7 +62,14 @@ body {
 .page {
     flex: 1;
     overflow-y: auto;
-    padding: 20px 20px 12px;
+    padding: 20px 20px calc(112px + env(safe-area-inset-bottom));
+    /* 内容从悬浮件下面滚过，玻璃的模糊才看得出来 */
+    padding-left: calc(20px + env(safe-area-inset-left));
+    padding-right: calc(20px + env(safe-area-inset-right));
+}
+
+.app.has-player .page {
+    padding-bottom: calc(192px + env(safe-area-inset-bottom));
 }
 
 .page h1 {
@@ -39,23 +81,53 @@ body {
 
 .page .hint { color: var(--sub); font-size: 14px; line-height: 1.6; }
 
-.searchbar { display: flex; gap: 8px; margin: 14px 0; }
+/* ---------- 搜索框：悬浮液态玻璃胶囊 ----------
+   sticky 在页面顶部，列表从它下面滚过，滚动时就是悬浮效果。 */
+.searchbar {
+    position: sticky;
+    top: 10px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0 18px;
+    padding: 6px 6px 6px 15px;
+    border-radius: 999px;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.searchbar:focus-within {
+    border-color: rgba(255, 255, 255, 0.95);
+    box-shadow:
+        0 18px 40px rgba(15, 23, 42, 0.16),
+        0 4px 12px rgba(15, 23, 42, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 1),
+        inset 0 -1px 1px rgba(255, 255, 255, 0.3);
+}
+.searchbar .search-icon { flex: none; color: var(--sub); }
 .searchbar input {
     flex: 1;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 10px 16px;
-    font-size: 15px;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    /* 16px 起步，避免 iOS 聚焦输入框时自动放大页面 */
+    font-size: 16px;
+    color: var(--ink);
     outline: none;
 }
+.searchbar input::placeholder { color: #aeaeb2; }
 .searchbar button {
+    flex: none;
     border: none;
     border-radius: 999px;
-    padding: 10px 18px;
+    padding: 9px 17px;
     background: var(--accent);
     color: #fff;
     font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s ease;
 }
+.searchbar button:active { transform: scale(0.95); }
 
 .songrow {
     display: flex;
@@ -70,40 +142,123 @@ body {
 .songrow .name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .songrow .artist { font-size: 13px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* ---------- 迷你播放器：同样悬浮在导航上方 ---------- */
 .miniplayer {
+    position: fixed;
+    z-index: 55;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 16px;
-    border-top: 1px solid var(--line);
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(12px);
+    gap: 10px;
+    width: var(--mp-w);
+    height: var(--mp-h);
+    left: calc(50% - var(--mp-w) / 2);
+    top: calc(100vh - var(--mp-h) - var(--bar-h) - 24px - env(safe-area-inset-bottom));
+    top: calc(100dvh - var(--mp-h) - var(--bar-h) - 24px - env(safe-area-inset-bottom));
+    padding: 7px 10px 7px 7px;
+    border-radius: 26px;
+    transition:
+        left 0.6s var(--ease-ios),
+        top 0.6s var(--ease-ios),
+        width 0.6s var(--ease-ios),
+        height 0.6s var(--ease-ios);
 }
-.miniplayer img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: var(--line); }
+.miniplayer img { width: 46px; height: 46px; border-radius: 17px; object-fit: cover; background: var(--line); flex: none; }
 .miniplayer .meta { flex: 1; min-width: 0; }
 .miniplayer .name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.miniplayer .artist { font-size: 12px; color: var(--sub); }
+.miniplayer .artist { font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .miniplayer button {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
     border: none;
+    border-radius: 999px;
     background: none;
-    font-size: 20px;
-    padding: 6px;
+    color: var(--ink);
     cursor: pointer;
+    transition: transform 0.15s ease, background 0.2s ease;
 }
+.miniplayer button:active { transform: scale(0.92); background: rgba(255, 255, 255, 0.55); }
 
+/* ---------- 底部导航：悬浮液态玻璃胶囊 ---------- */
 .tabbar {
+    position: fixed;
+    z-index: 60;
     display: flex;
-    border-top: 1px solid var(--line);
-    padding-bottom: env(safe-area-inset-bottom);
-    background: #fff;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 2px;
+    width: var(--bar-w);
+    max-width: calc(100vw - 32px);
+    height: var(--bar-h);
+    left: calc(50% - var(--bar-w) / 2);
+    top: calc(100vh - var(--bar-h) - 14px - env(safe-area-inset-bottom));
+    top: calc(100dvh - var(--bar-h) - 14px - env(safe-area-inset-bottom));
+    padding: 6px;
+    border-radius: 999px;
+    /* 旋转设备时，位置与尺寸一起补间，整条导航滑过去而不是跳过去 */
+    transition:
+        left 0.6s var(--ease-ios),
+        top 0.6s var(--ease-ios),
+        width 0.6s var(--ease-ios),
+        height 0.6s var(--ease-ios);
 }
 .tabbar button {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
     border: none;
+    border-radius: 999px;
     background: none;
-    padding: 10px 0 8px;
-    font-size: 12px;
+    padding: 4px 0;
+    font-size: 11px;
+    letter-spacing: 0.02em;
     color: var(--sub);
     cursor: pointer;
+    transition: background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, transform 0.15s ease;
 }
-.tabbar button.active { color: var(--ink); font-weight: 700; }
+.tabbar button:active { transform: scale(0.94); }
+.tabbar button.active {
+    color: var(--ink);
+    font-weight: 600;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.7));
+    box-shadow:
+        0 3px 10px rgba(15, 23, 42, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 1),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+
+/* ---------- 横屏：导航过渡到右侧竖排（参照 Duo 式侧边栏） ----------
+   同一个 .tabbar 元素，只换位置/尺寸/主轴方向；上面 transition 负责平滑过渡。
+   内容区右侧让出导航的宽度，迷你播放器贴底并向左避开右侧栏。 */
+@media (orientation: landscape) {
+    .tabbar {
+        --bar-w: 64px;
+        --bar-h: min(304px, calc(100vh - 32px));
+        --bar-h: min(304px, calc(100dvh - 32px));
+        flex-direction: column;
+        left: calc(100vw - var(--bar-w) - 14px - env(safe-area-inset-right));
+        top: calc(50vh - var(--bar-h) / 2);
+        top: calc(50dvh - var(--bar-h) / 2);
+    }
+
+    .page {
+        padding-right: calc(96px + env(safe-area-inset-right));
+        padding-bottom: 28px;
+    }
+    .app.has-player .page { padding-bottom: 108px; }
+
+    .miniplayer {
+        --mp-w: min(520px, calc(100vw - 150px));
+        /* 在「去掉右侧栏后的可用宽度」里居中 */
+        left: calc((100vw - 96px - env(safe-area-inset-right)) / 2 - var(--mp-w) / 2 + env(safe-area-inset-left) / 2);
+        top: calc(100vh - var(--mp-h) - 12px - env(safe-area-inset-bottom));
+        top: calc(100dvh - var(--mp-h) - 12px - env(safe-area-inset-bottom));
+    }
+}
