@@ -1,0 +1,109 @@
+:root {
+    --bg: #ffffff;
+    --ink: #111111;
+    --sub: #8a8a8e;
+    --line: #eeeeee;
+    --accent: #111111;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root { height: 100%; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+}
+
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding-top: env(safe-area-inset-top);
+}
+
+.page {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 20px 12px;
+}
+
+.page h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+}
+
+.page .hint { color: var(--sub); font-size: 14px; line-height: 1.6; }
+
+.searchbar { display: flex; gap: 8px; margin: 14px 0; }
+.searchbar input {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-size: 15px;
+    outline: none;
+}
+.searchbar button {
+    border: none;
+    border-radius: 999px;
+    padding: 10px 18px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 15px;
+}
+
+.songrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+}
+.songrow img { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: var(--line); }
+.songrow .meta { flex: 1; min-width: 0; }
+.songrow .name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.songrow .artist { font-size: 13px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.miniplayer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-top: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+}
+.miniplayer img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: var(--line); }
+.miniplayer .meta { flex: 1; min-width: 0; }
+.miniplayer .name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.miniplayer .artist { font-size: 12px; color: var(--sub); }
+.miniplayer button {
+    border: none;
+    background: none;
+    font-size: 20px;
+    padding: 6px;
+    cursor: pointer;
+}
+
+.tabbar {
+    display: flex;
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: #fff;
+}
+.tabbar button {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 10px 0 8px;
+    font-size: 12px;
+    color: var(--sub);
+    cursor: pointer;
+}
+.tabbar button.active { color: var(--ink); font-weight: 700; }
