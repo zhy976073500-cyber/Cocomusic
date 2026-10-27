@@ -38,9 +38,17 @@ const BASE_OPTIONS: LiquidGLOptions = {
     specular: true,
     shadow: false,
     reveal: 'fade',
+    // 实时交互：手指/指针划过玻璃表面时产生黏性位移，玻璃是「活」的
+    interaction: 'fluid',
+    interactionStrength: 0.45,
+    interactionRadius: 0.4,
+    interactionViscosity: 0.6,
 };
 
-async function glassify(selector: string, zIndex: number): Promise<void> {
+type LensInstance = { destroy?: () => void };
+const instances = new Map<string, LensInstance[]>();
+
+async function glassify(selector: string, zIndex: number, onClass: string, extra: LiquidGLOptions = {}): Promise<void> {
     if (done.has(selector)) return;
     const el = document.querySelector(selector);
     if (!el) return;
@@ -48,28 +56,61 @@ async function glassify(selector: string, zIndex: number): Promise<void> {
     if (!ok || !window.liquidGL) return;
     done.add(selector);
     try {
-        window.liquidGL({
+        const result = window.liquidGL({
             ...BASE_OPTIONS,
+            ...extra,
             target: selector,
             zIndex,
             on: {
                 init() {
-                    document.documentElement.classList.add('lg-on');
+                    document.documentElement.classList.add(onClass);
                     registerBackdrop();
                 },
             },
-        });
+        }) as LensInstance | LensInstance[] | undefined;
+        if (result) instances.set(selector, Array.isArray(result) ? result : [result]);
     } catch {
         done.delete(selector);
     }
 }
 
+// 旋转屏幕后调用：销毁全部透镜并按新方向重新初始化。
+// liquidGL 的画布取景方向在初始化时定死，横竖切换后透镜位置会错位，只能重建。
+export function reinitGlass(): void {
+    for (const list of instances.values()) {
+        for (const inst of list) {
+            try { inst.destroy?.(); } catch { /* 已失效的实例忽略 */ }
+        }
+    }
+    instances.clear();
+    done.clear();
+    document.documentElement.classList.remove('lg-bar', 'lg-ind');
+    glassifyChrome();
+    glassifyIndicator();
+    if (document.querySelector('.miniplayer')) glassifyMiniPlayer();
+}
+
 export function glassifyChrome(): void {
-    void glassify('.tabbar', 60);
+    void glassify('.tabbar', 60, 'lg-bar');
 }
 
 export function glassifyMiniPlayer(): void {
-    void glassify('.miniplayer', 55);
+    void glassify('.miniplayer', 55, 'lg-bar');
+}
+
+// App Store 式选中透镜：带放大 + 大倒角，停在当前 tab 图标下层。
+// zIndex 必须低于导航条（60）：透镜画布是视口级图层，若高于导航条会盖住图标；
+// 放在 59 层，透过导航条自身的玻璃看过去就是嵌在条里的透镜。
+export function glassifyIndicator(): void {
+    void glassify('.tab-ind', 59, 'lg-ind', {
+        magnify: 1.06,
+        refraction: 0.008,
+        bevelDepth: 0.07,
+        bevelWidth: 0.22,
+        frost: 0,
+        aberration: 0.06,
+        interaction: 'none',
+    });
 }
 
 let backdropRegistered = false;

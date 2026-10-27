@@ -9,7 +9,7 @@ import PlaylistDetailPage, { type RemotePlaylistRef } from './pages/PlaylistDeta
 import PlayerPage from './components/PlayerPage';
 import Announcement from './components/Announcement';
 import { Cover, usePlayer } from './ui';
-import { glassifyChrome, glassifyMiniPlayer, refreshGlassSoon } from './lib/liquidGlass';
+import { glassifyChrome, glassifyIndicator, glassifyMiniPlayer, refreshGlass, refreshGlassSoon, reinitGlass } from './lib/liquidGlass';
 
 type Tab = 'home' | 'search' | 'library' | 'local' | 'me';
 
@@ -131,12 +131,35 @@ export default function App() {
 
     useEffect(() => { document.title = 'Cocomusic'; }, []);
 
-    // 液态玻璃：导航先上；页面滚动停下、切 tab、开/关歌单后重拍快照让折射跟上内容
+    // 液态玻璃：导航先上；滚动时节流重拍 + 停下再拍，让折射尽量实时跟上内容；
+    // 切 tab、开/关歌单后也重拍
     useEffect(() => {
         glassifyChrome();
-        const onScroll = () => refreshGlassSoon(250);
+        glassifyIndicator();
+        let last = 0;
+        const onScroll = () => {
+            const now = performance.now();
+            if (now - last > 220) { last = now; refreshGlass(); }
+            refreshGlassSoon(250);
+        };
         document.addEventListener('scroll', onScroll, true);
         return () => document.removeEventListener('scroll', onScroll, true);
+    }, []);
+
+    // 旋转屏幕后重建透镜：liquidGL 的画布在旧方向取景，横竖切换后位置会错位，
+    // 等布局落定后按新方向重新初始化一次，玻璃与导航一起归位
+    useEffect(() => {
+        let land = window.innerWidth > window.innerHeight;
+        let timer = 0;
+        const onResize = () => {
+            const nowLand = window.innerWidth > window.innerHeight;
+            if (nowLand === land) return;
+            land = nowLand;
+            window.clearTimeout(timer);
+            timer = window.setTimeout(() => reinitGlass(), 420);
+        };
+        window.addEventListener('resize', onResize);
+        return () => { window.removeEventListener('resize', onResize); window.clearTimeout(timer); };
     }, []);
 
     useEffect(() => { refreshGlassSoon(); }, [tab, detail]);
@@ -178,7 +201,12 @@ export default function App() {
                 </>
             )}
             <MiniPlayer onOpen={() => setPlayerOpen(true)} />
-            <nav className="tabbar glass" aria-label="主导航">
+            <nav
+                className="tabbar glass"
+                aria-label="主导航"
+                style={{ '--tab-i': Math.max(0, TABS.findIndex((t) => t.id === tab)) } as React.CSSProperties}
+            >
+                <span className="tab-ind" aria-hidden />
                 {TABS.map((t) => (
                     <button
                         key={t.id}

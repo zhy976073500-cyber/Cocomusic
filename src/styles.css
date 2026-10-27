@@ -170,21 +170,21 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    /* 锚点恒为左上角，位置全部走 transform —— 旋转时只有 transform/宽高在变，
-       WebKit 对 transform 的补间最可靠（旧方案靠 CSS 变量驱动 left/top，
-       WKWebView 里变量变化不触发过渡，横屏就成了瞬移）。 */
+    /* v3 定位：left/right + margin-inline:auto 居中、bottom 锚定。
+       不再用 vw/env 拼 transform —— 真机 WKWebView 里那套算法横屏会算错位（导航卡屏外）。
+       纯锚定不依赖任何视口宽度计算，哪个方向都不会错位。 */
     left: 0;
-    top: 0;
+    right: 0;
+    margin-inline: auto;
+    bottom: calc(64px + 14px + 10px + env(safe-area-inset-bottom));
     width: min(520px, calc(100vw - 32px));
     height: 60px;
-    transform: translate3d(calc(50vw - min(260px, calc(50vw - 16px))), calc(100dvh - 60px - 64px - 24px - env(safe-area-inset-bottom)), 0);
     padding: 7px 10px 7px 7px;
     border-radius: 26px;
-    will-change: transform;
     transition:
-        transform var(--dur-layout) var(--ease-ios),
         width var(--dur-layout) var(--ease-ios),
-        height var(--dur-layout) var(--ease-ios);
+        bottom var(--dur-layout) var(--ease-ios),
+        right var(--dur-layout) var(--ease-ios);
 }
 .miniplayer img { width: 46px; height: 46px; border-radius: 17px; object-fit: cover; background: var(--line); flex: none; }
 .miniplayer .meta { flex: 1; min-width: 0; }
@@ -213,22 +213,46 @@ body {
     flex-direction: row;
     align-items: stretch;
     gap: 2px;
-    /* 同样走 transform 定位（理由见 .miniplayer）：锚点恒为左上角 */
+    /* v3 定位：margin-inline:auto 水平居中 + bottom 锚定（理由见 .miniplayer） */
     left: 0;
-    top: 0;
+    right: 0;
+    margin-inline: auto;
+    bottom: calc(14px + env(safe-area-inset-bottom));
     width: min(360px, calc(100vw - 32px));
     height: 64px;
-    transform: translate3d(calc(50vw - min(180px, calc(50vw - 16px))), calc(100dvh - 64px - 14px - env(safe-area-inset-bottom)), 0);
     padding: 6px;
     border-radius: 999px;
-    will-change: transform;
-    /* 旋转设备时 transform 与宽高一起补间，整条导航滑过去而不是跳过去 */
     transition:
-        transform var(--dur-layout) var(--ease-ios),
         width var(--dur-layout) var(--ease-ios),
         height var(--dur-layout) var(--ease-ios);
 }
+
+/* 选中透镜：App Store 式的大圆玻璃泡，比导航条还高、上下都凸出去，
+   停在当前 tab 下层把图标包住；切换时用弹簧曲线滑过去带过冲。
+   liquidGL 可用时它就是真折射透镜（带放大），否则用下面这套 CSS 玻璃兜底。 */
+.tabbar .tab-ind {
+    position: absolute;
+    top: 50%;
+    width: 76px;
+    height: 76px;
+    margin-top: -38px;
+    left: calc(6px + var(--tab-i, 0) * ((100% - 20px) / 5 + 2px) + ((100% - 20px) / 5 - 76px) / 2);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.32);
+    -webkit-backdrop-filter: blur(14px) saturate(1.7);
+    backdrop-filter: blur(14px) saturate(1.7);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow:
+        0 10px 28px rgba(15, 23, 42, 0.16),
+        0 2px 8px rgba(15, 23, 42, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 0.9),
+        inset 0 -8px 16px rgba(255, 255, 255, 0.25);
+    transition: left 0.55s cubic-bezier(0.32, 1.45, 0.36, 1);
+    pointer-events: none;
+}
 .tabbar button {
+    position: relative;
+    z-index: 1;
     flex: 1 1 0;
     min-width: 0;
     min-height: 0;
@@ -245,17 +269,17 @@ body {
     letter-spacing: 0.02em;
     color: var(--sub);
     cursor: pointer;
-    transition: background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, transform 0.15s ease;
+    /* Q弹：松开后用带过冲的弹簧曲线回弹（cubic-bezier 第二个值 >1 就是过冲） */
+    transition: color 0.25s ease, transform 0.5s cubic-bezier(0.34, 2.0, 0.4, 1);
 }
-.tabbar button:active { transform: scale(0.94); }
+.tabbar button:active {
+    transform: scale(0.78);
+    transition-duration: 0.1s;
+    transition-timing-function: ease-out;
+}
 .tabbar button.active {
     color: var(--ink);
     font-weight: 600;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.7));
-    box-shadow:
-        0 3px 10px rgba(15, 23, 42, 0.12),
-        inset 0 1px 0 rgba(255, 255, 255, 1),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.8);
 }
 
 /* ---------- 横屏：导航过渡到右侧竖排（参照 Duo 式侧边栏） ----------
@@ -264,11 +288,26 @@ body {
 @media (orientation: landscape) {
     .tabbar {
         flex-direction: column;
-        /* 横屏竖轨按手机横屏高度定比例：高最多 300px 且不超过屏高 64%，宽 62px，
-           右侧留安全区，垂直居中 —— 全部写进 transform 的字面量 calc，不经过 CSS 变量 */
+        /* v3：right 直接锚定（含安全区），top 50% + translateY(-50%) 垂直居中。
+           水平位置不做任何视口宽度计算，不可能再卡到屏外。 */
+        left: auto;
+        right: calc(12px + env(safe-area-inset-right));
+        margin: 0;
+        top: 50%;
+        bottom: auto;
+        transform: translateY(-50%);
         width: 62px;
         height: min(300px, 64dvh);
-        transform: translate3d(calc(100vw - 62px - 12px - env(safe-area-inset-right)), calc(50dvh - min(150px, 32dvh)), 0);
+    }
+
+    .tabbar .tab-ind {
+        width: 68px;
+        height: 68px;
+        left: 50%;
+        margin-left: -34px;
+        margin-top: 0;
+        top: calc(6px + var(--tab-i, 0) * ((100% - 20px) / 5 + 2px) + ((100% - 20px) / 5 - 68px) / 2);
+        transition: top 0.55s cubic-bezier(0.32, 1.45, 0.36, 1);
     }
 
     .page {
@@ -288,8 +327,9 @@ body {
 
     .miniplayer {
         width: min(520px, calc(100vw - 150px));
-        /* 在「去掉右侧栏后的可用宽度」里居中，贴底 */
-        transform: translate3d(calc(50vw - 45px - min(260px, calc(50vw - 75px))), calc(100dvh - 60px - 12px - env(safe-area-inset-bottom)), 0);
+        /* 右侧让出竖轨宽度后，margin-auto 在剩余可用宽度里居中，贴底 */
+        right: calc(90px + env(safe-area-inset-right));
+        bottom: calc(12px + env(safe-area-inset-bottom));
     }
 }
 
@@ -495,10 +535,39 @@ body {
    liquidGL 首帧渲染成功才给 <html> 加 .lg-on；此时关掉这两个元素自带的
    毛玻璃背景与 backdrop 模糊，只留边线与阴影，玻璃本体由 WebGL 画。
    没加 .lg-on（无 WebGL/快照失败）时什么都不变，继续用 .glass 配方兜底。 */
-html.lg-on .tabbar,
-html.lg-on .miniplayer {
+html.lg-bar .tabbar,
+html.lg-bar .miniplayer {
     background: transparent;
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     border-color: rgba(255, 255, 255, 0.38);
 }
+html.lg-ind .tabbar .tab-ind {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+}
+
+/* ---------- Q弹按压反馈（全局） ----------
+   按下快速缩小，松开用带过冲的弹簧曲线弹回 —— 就是 Sage 要的「Q弹」。
+   过冲靠 cubic-bezier 的第二个控制点 >1 实现，WebKit 原生支持。 */
+.songrow, .toprow, .entryrow {
+    transition: transform 0.45s cubic-bezier(0.34, 1.9, 0.4, 1), background 0.2s ease;
+}
+.songrow:active, .toprow:active, .entryrow:active {
+    transform: scale(0.98);
+    transition-duration: 0.1s;
+}
+.plcard { transition: transform 0.45s cubic-bezier(0.34, 1.9, 0.4, 1); }
+.plcard:active { transform: scale(0.94); transition-duration: 0.1s; }
+.iconbtn { transition: transform 0.45s cubic-bezier(0.34, 2.0, 0.4, 1), background 0.2s ease, color 0.2s ease; }
+.iconbtn:active { transform: scale(0.82); transition-duration: 0.1s; }
+.playall { transition: transform 0.45s cubic-bezier(0.34, 2.0, 0.4, 1); }
+.playall:active { transform: scale(0.93); transition-duration: 0.1s; }
+.pp-ctl { transition: transform 0.45s cubic-bezier(0.34, 2.0, 0.4, 1); }
+.pp-ctl:active { transform: scale(0.85); transition-duration: 0.1s; }
+.miniplayer button { transition: transform 0.45s cubic-bezier(0.34, 2.0, 0.4, 1), background 0.2s ease; }
+.searchbar button { transition: transform 0.45s cubic-bezier(0.34, 2.0, 0.4, 1); }
+.searchbar button:active { transform: scale(0.9); transition-duration: 0.1s; }
