@@ -1,14 +1,17 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { player } from './lib/player';
-import { searchAll, type Song } from './lib/api';
+import HomePage from './pages/HomePage';
+import SearchPage from './pages/SearchPage';
+import LibraryPage from './pages/LibraryPage';
+import LocalPage from './pages/LocalPage';
+import AccountsPage from './pages/AccountsPage';
+import PlaylistDetailPage, { type RemotePlaylistRef } from './pages/PlaylistDetailPage';
+import PlayerPage from './components/PlayerPage';
+import Announcement from './components/Announcement';
+import { Cover, usePlayer } from './ui';
 
-type Tab = 'home' | 'search' | 'library' | 'local';
+type Tab = 'home' | 'search' | 'library' | 'local' | 'me';
 
-function usePlayer() {
-    return useSyncExternalStore(player.subscribe, player.getSnapshot);
-}
-
-// 导航图标：细线 SVG，跟随按钮的 currentColor（未选中灰、选中黑）
 function NavIcon({ tab }: { tab: Tab }) {
     const common = {
         width: 23,
@@ -50,93 +53,39 @@ function NavIcon({ tab }: { tab: Tab }) {
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
             );
-    }
-}
-
-function SearchPage() {
-    const [kw, setKw] = useState('');
-    const [results, setResults] = useState<Song[]>([]);
-    const [status, setStatus] = useState('');
-
-    async function run() {
-        if (!kw.trim()) return;
-        setStatus('搜索中…');
-        try {
-            const songs = await searchAll(kw.trim());
-            setResults(songs);
-            setStatus(songs.length ? '' : '没搜到结果');
-        } catch (e) {
-            setStatus(`搜索失败：${e instanceof Error ? e.message : String(e)}`);
-        }
-    }
-
-    return (
-        <div className="page">
-            <h1>搜索</h1>
-            <div className="searchbar glass">
-                <svg
-                    className="search-icon"
-                    width="19"
-                    height="19"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    aria-hidden
-                >
-                    <circle cx="11" cy="11" r="7" />
-                    <path d="m21 21-4.35-4.35" />
+        case 'me':
+            return (
+                <svg {...common}>
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" />
                 </svg>
-                <input
-                    value={kw}
-                    onChange={(e) => setKw(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') void run(); }}
-                    placeholder="搜歌曲 / 歌手"
-                    enterKeyHint="search"
-                />
-                <button onClick={() => void run()}>搜索</button>
-            </div>
-            {status && <p className="hint">{status}</p>}
-            {results.map((s, i) => (
-                <div key={`${s.provider}-${s.id}`} className="songrow" onClick={() => void player.playQueue(results, i)}>
-                    {s.coverUrl ? <img src={s.coverUrl} alt="" /> : <img alt="" />}
-                    <div className="meta">
-                        <div className="name">{s.name}</div>
-                        <div className="artist">{s.artists} · {s.album}</div>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
+            );
+    }
 }
 
-function PlaceholderPage({ title, hint }: { title: string; hint: string }) {
-    return (
-        <div className="page">
-            <h1>{title}</h1>
-            <p className="hint">{hint}</p>
-        </div>
-    );
-}
-
-function MiniPlayer() {
+function MiniPlayer({ onOpen }: { onOpen: () => void }) {
     const p = usePlayer();
     const cur = p.current;
     if (!cur) return null;
     return (
-        <div className="miniplayer glass">
-            {cur.coverUrl ? <img src={cur.coverUrl} alt="" /> : <img alt="" />}
+        <div className="miniplayer glass" onClick={onOpen}>
+            <Cover src={cur.coverUrl} size={44} radius={9} />
             <div className="meta">
                 <div className="name">{cur.name}</div>
                 <div className="artist">{cur.artists}</div>
             </div>
-            <button onClick={() => void p.prev()} aria-label="上一首">
+            <button
+                onClick={(e) => { e.stopPropagation(); void p.prev(); }}
+                aria-label="上一首"
+            >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                     <path d="M7 5h2.2v14H7zM19 5.8v12.4c0 .9-1 1.5-1.8 1L9.6 13a1.15 1.15 0 0 1 0-2L17.2 4.9c.8-.6 1.8 0 1.8.9z" />
                 </svg>
             </button>
-            <button onClick={() => p.toggle()} aria-label={p.playing ? '暂停' : '播放'}>
+            <button
+                onClick={(e) => { e.stopPropagation(); p.toggle(); }}
+                aria-label={p.playing ? '暂停' : '播放'}
+            >
                 {p.playing ? (
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                         <rect x="6" y="4.5" width="4" height="15" rx="1.2" />
@@ -148,7 +97,10 @@ function MiniPlayer() {
                     </svg>
                 )}
             </button>
-            <button onClick={() => void p.next()} aria-label="下一首">
+            <button
+                onClick={(e) => { e.stopPropagation(); void p.next(); }}
+                aria-label="下一首"
+            >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                     <path d="M14.8 5H17v14h-2.2zM5 5.8v12.4c0 .9 1 1.5 1.8 1L14.4 13a1.15 1.15 0 0 0 0-2L6.8 4.9C6 4.3 5 4.9 5 5.8z" />
                 </svg>
@@ -162,33 +114,74 @@ const TABS: { id: Tab; label: string }[] = [
     { id: 'search', label: '搜索' },
     { id: 'library', label: '歌单' },
     { id: 'local', label: '本地' },
+    { id: 'me', label: '我的' },
 ];
 
 export default function App() {
-    const [tab, setTab] = useState<Tab>('search');
+    const [tab, setTab] = useState<Tab>(() => {
+        const t = new URLSearchParams(window.location.search).get('tab');
+        return t === 'search' || t === 'library' || t === 'local' || t === 'me' ? t : 'home';
+    });
+    const [detail, setDetail] = useState<RemotePlaylistRef | null>(null);
+    const [playerOpen, setPlayerOpen] = useState(false);
+    const [noticeShown, setNoticeShown] = useState('');
     const p = usePlayer();
+
     useEffect(() => { document.title = 'Cocomusic'; }, []);
+
+    // 截图/自检用：带 ?demo=1 打开时自动播一首网易云的歌并展开播放页（正常使用不触发）
+    useEffect(() => {
+        if (!new URLSearchParams(window.location.search).has('demo')) return;
+        void (async () => {
+            const { searchNetease } = await import('./lib/api');
+            const songs = await searchNetease('周杰伦', 10).catch(() => []);
+            if (songs.length) {
+                void player.playQueue(songs, 0).catch(() => undefined);
+                setPlayerOpen(true);
+            }
+        })();
+    }, []);
+
+    useEffect(() => {
+        if (p.notice && p.notice !== noticeShown) {
+            setNoticeShown(p.notice);
+            const t = window.setTimeout(() => setNoticeShown(''), 4000);
+            return () => window.clearTimeout(t);
+        }
+    }, [p.notice, noticeShown]);
+
+    const openPlaylist = (ref: RemotePlaylistRef) => setDetail(ref);
 
     return (
         <div className={`app${p.current ? ' has-player' : ''}`}>
-            {tab === 'home' && <PlaceholderPage title="Cocomusic" hint="推荐 / 排行榜 / 平台歌单同步，按对标 Folia 的清单逐项补齐中。" />}
-            {tab === 'search' && <SearchPage />}
-            {tab === 'library' && <PlaceholderPage title="我的歌单" hint="收藏、自建歌单、播放历史，本地存储先行，后续接平台账号同步。" />}
-            {tab === 'local' && <PlaceholderPage title="本地导入" hint="文件选择器多选音频 + 同名 .lrc 一起导入，IndexedDB 存音频，联网补封面与逐字歌词（沿用 Folia 本地版验证过的方案）。" />}
-            <MiniPlayer />
+            {detail ? (
+                <PlaylistDetailPage target={detail} onBack={() => setDetail(null)} />
+            ) : (
+                <>
+                    {tab === 'home' && <HomePage openPlaylist={openPlaylist} />}
+                    {tab === 'search' && <SearchPage />}
+                    {tab === 'library' && <LibraryPage />}
+                    {tab === 'local' && <LocalPage />}
+                    {tab === 'me' && <AccountsPage openPlaylist={openPlaylist} />}
+                </>
+            )}
+            <MiniPlayer onOpen={() => setPlayerOpen(true)} />
             <nav className="tabbar glass" aria-label="主导航">
                 {TABS.map((t) => (
                     <button
                         key={t.id}
-                        className={tab === t.id ? 'active' : ''}
-                        onClick={() => setTab(t.id)}
-                        aria-current={tab === t.id ? 'page' : undefined}
+                        className={tab === t.id && !detail ? 'active' : ''}
+                        onClick={() => { setTab(t.id); setDetail(null); }}
+                        aria-current={tab === t.id && !detail ? 'page' : undefined}
                     >
                         <NavIcon tab={t.id} />
                         <span>{t.label}</span>
                     </button>
                 ))}
             </nav>
+            {noticeShown && <div className="app-toast" onClick={() => setNoticeShown('')}>{noticeShown}</div>}
+            {playerOpen && p.current && <PlayerPage onClose={() => setPlayerOpen(false)} />}
+            <Announcement />
         </div>
     );
 }

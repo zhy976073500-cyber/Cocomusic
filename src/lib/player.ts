@@ -3,6 +3,8 @@
 
 import type { Song } from './api';
 import { resolvePlayUrl } from './api';
+import { getLocalObjectUrl } from './local';
+import { library } from './library';
 
 export type PlayMode = 'sequence' | 'repeat-all' | 'repeat-one' | 'shuffle';
 
@@ -17,6 +19,9 @@ class Player {
     mode: PlayMode = 'repeat-all';
     currentTime = 0;
     duration = 0;
+    /** 放不了时给 UI 的一次性提示（如整队列都拿不到播放地址） */
+    notice = '';
+    private failStreak = 0;
 
     constructor() {
         this.audio.addEventListener('play', () => { this.playing = true; this.emit(); });
@@ -34,6 +39,15 @@ class Player {
 
     get current(): Song | null {
         return this.index >= 0 ? this.queue[this.index] ?? null : null;
+    }
+
+    /** rAF 驱动的 UI（进度条/歌词）直接读真实播放时钟，不经 React state */
+    getTime(): number {
+        return this.audio.currentTime || 0;
+    }
+
+    getDuration(): number {
+        return this.audio.duration || 0;
     }
 
     subscribe = (fn: Listener) => {
@@ -56,10 +70,32 @@ class Player {
         const song = this.queue[i];
         if (!song) return;
         this.index = i;
-        const url = await resolvePlayUrl(song);
-        if (!url) { void this.next(); return; }
+        let url: string | null = null;
+        try {
+            url = song.provider === 'local'
+                ? await getLocalObjectUrl(song.localKey ?? song.id)
+                : await resolvePlayUrl(song);
+        } catch {
+            url = null;
+        }
+        if (!url) {
+            // 拿不到地址就跳下一首；整队列都失败时停下并提示，避免无限循环空转
+            this.failStreak += 1;
+            if (this.failStreak >= Math.max(1, this.queue.length)) {
+                this.failStreak = 0;
+                this.playing = false;
+                this.notice = '这几首暂时都拿不到播放地址，换个音源或稍后再试';
+                this.emit();
+                return;
+            }
+            await this.next();
+            return;
+        }
+        this.failStreak = 0;
+        this.notice = '';
         this.audio.src = url;
         await this.audio.play();
+        library.recordHistory(song);
         if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = new MediaMetadata({
                 title: song.name,
@@ -105,6 +141,34 @@ class Player {
 
     seek(seconds: number) {
         this.audio.currentTime = seconds;
+    }
+
+    cycleMode(): PlayMode {
+        const order: PlayMode[] = ['repeat-all', 'repeat-one', 'shuffle', 'sequence'];
+        const next = order[(order.indexOf(this.mode) + 1) % order.length];
+        this.mode = next;
+        this.emit();
+        return next;
+    }
+
+    /** 在当前歌曲后插入一首（「下一首播放」） */
+    insertNext(song: Song) {
+        if (!this.queue.length) {
+            this.queue = [song];
+            return;
+        }
+        this.queue = [
+            ...this.queue.slice(0, this.index + 1),
+            song,
+            ...this.queue.slice(this.index + 1),
+        ];
+        this.emit();
+    }
+
+    appendToQueue(song: Song) {
+        if (this.queue.some((s) => s.provider === song.provider && s.id === song.id)) return;
+        this.queue = [...this.queue, song];
+        this.emit();
     }
 }
 
