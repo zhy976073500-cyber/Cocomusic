@@ -9,6 +9,7 @@ import PlaylistDetailPage, { type RemotePlaylistRef } from './pages/PlaylistDeta
 import PlayerPage from './components/PlayerPage';
 import Announcement from './components/Announcement';
 import { Cover, usePlayer } from './ui';
+import { glassifyChrome, glassifyMiniPlayer, refreshGlassSoon } from './lib/liquidGlass';
 
 type Tab = 'home' | 'search' | 'library' | 'local' | 'me';
 
@@ -66,6 +67,7 @@ function NavIcon({ tab }: { tab: Tab }) {
 function MiniPlayer({ onOpen }: { onOpen: () => void }) {
     const p = usePlayer();
     const cur = p.current;
+    useEffect(() => { if (cur) glassifyMiniPlayer(); }, [cur]);
     if (!cur) return null;
     return (
         <div className="miniplayer glass" onClick={onOpen}>
@@ -128,6 +130,16 @@ export default function App() {
     const p = usePlayer();
 
     useEffect(() => { document.title = 'Cocomusic'; }, []);
+
+    // 液态玻璃：导航先上；页面滚动停下、切 tab、开/关歌单后重拍快照让折射跟上内容
+    useEffect(() => {
+        glassifyChrome();
+        const onScroll = () => refreshGlassSoon(250);
+        document.addEventListener('scroll', onScroll, true);
+        return () => document.removeEventListener('scroll', onScroll, true);
+    }, []);
+
+    useEffect(() => { refreshGlassSoon(); }, [tab, detail]);
 
     // 截图/自检用：带 ?demo=1 打开时自动播一首网易云的歌并展开播放页（正常使用不触发）
     useEffect(() => {

@@ -169,17 +169,19 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    width: var(--mp-w);
-    height: var(--mp-h);
-    left: calc(50% - var(--mp-w) / 2);
-    top: calc(100vh - var(--mp-h) - var(--bar-h) - 24px - env(safe-area-inset-bottom));
-    top: calc(100dvh - var(--mp-h) - var(--bar-h) - 24px - env(safe-area-inset-bottom));
+    /* 锚点恒为左上角，位置全部走 transform —— 旋转时只有 transform/宽高在变，
+       WebKit 对 transform 的补间最可靠（旧方案靠 CSS 变量驱动 left/top，
+       WKWebView 里变量变化不触发过渡，横屏就成了瞬移）。 */
+    left: 0;
+    top: 0;
+    width: min(520px, calc(100vw - 32px));
+    height: 60px;
+    transform: translate3d(calc(50vw - min(260px, calc(50vw - 16px))), calc(100dvh - 60px - 64px - 24px - env(safe-area-inset-bottom)), 0);
     padding: 7px 10px 7px 7px;
     border-radius: 26px;
-    will-change: left, top, width, height;
+    will-change: transform;
     transition:
-        left var(--dur-layout) var(--ease-ios),
-        top var(--dur-layout) var(--ease-ios),
+        transform var(--dur-layout) var(--ease-ios),
         width var(--dur-layout) var(--ease-ios),
         height var(--dur-layout) var(--ease-ios);
 }
@@ -210,19 +212,18 @@ body {
     flex-direction: row;
     align-items: stretch;
     gap: 2px;
-    width: var(--bar-w);
-    max-width: calc(100vw - 32px);
-    height: var(--bar-h);
-    left: calc(50% - var(--bar-w) / 2);
-    top: calc(100vh - var(--bar-h) - 14px - env(safe-area-inset-bottom));
-    top: calc(100dvh - var(--bar-h) - 14px - env(safe-area-inset-bottom));
+    /* 同样走 transform 定位（理由见 .miniplayer）：锚点恒为左上角 */
+    left: 0;
+    top: 0;
+    width: min(360px, calc(100vw - 32px));
+    height: 64px;
+    transform: translate3d(calc(50vw - min(180px, calc(50vw - 16px))), calc(100dvh - 64px - 14px - env(safe-area-inset-bottom)), 0);
     padding: 6px;
     border-radius: 999px;
-    will-change: left, top, width, height;
-    /* 旋转设备时，位置与尺寸一起补间，整条导航滑过去而不是跳过去 */
+    will-change: transform;
+    /* 旋转设备时 transform 与宽高一起补间，整条导航滑过去而不是跳过去 */
     transition:
-        left var(--dur-layout) var(--ease-ios),
-        top var(--dur-layout) var(--ease-ios),
+        transform var(--dur-layout) var(--ease-ios),
         width var(--dur-layout) var(--ease-ios),
         height var(--dur-layout) var(--ease-ios);
 }
@@ -261,13 +262,12 @@ body {
    内容区右侧让出导航的宽度，迷你播放器贴底并向左避开右侧栏。 */
 @media (orientation: landscape) {
     .tabbar {
-        --bar-w: 64px;
-        --bar-h: min(304px, calc(100vh - 32px));
-        --bar-h: min(304px, calc(100dvh - 32px));
         flex-direction: column;
-        left: calc(100vw - var(--bar-w) - 14px - env(safe-area-inset-right));
-        top: calc(50vh - var(--bar-h) / 2);
-        top: calc(50dvh - var(--bar-h) / 2);
+        /* 横屏竖轨按手机横屏高度定比例：高最多 300px 且不超过屏高 64%，宽 62px，
+           右侧留安全区，垂直居中 —— 全部写进 transform 的字面量 calc，不经过 CSS 变量 */
+        width: 62px;
+        height: min(300px, 64dvh);
+        transform: translate3d(calc(100vw - 62px - 12px - env(safe-area-inset-right)), calc(50dvh - min(150px, 32dvh)), 0);
     }
 
     .page {
@@ -291,11 +291,9 @@ body {
     .searchbar button { padding: 6px 13px; font-size: 14px; }
 
     .miniplayer {
-        --mp-w: min(520px, calc(100vw - 150px));
-        /* 在「去掉右侧栏后的可用宽度」里居中 */
-        left: calc((100vw - 96px - env(safe-area-inset-right)) / 2 - var(--mp-w) / 2 + env(safe-area-inset-left) / 2);
-        top: calc(100vh - var(--mp-h) - 12px - env(safe-area-inset-bottom));
-        top: calc(100dvh - var(--mp-h) - 12px - env(safe-area-inset-bottom));
+        width: min(520px, calc(100vw - 150px));
+        /* 在「去掉右侧栏后的可用宽度」里居中，贴底 */
+        transform: translate3d(calc(50vw - 45px - min(260px, calc(50vw - 75px))), calc(100dvh - 60px - 12px - env(safe-area-inset-bottom)), 0);
     }
 }
 
@@ -495,4 +493,16 @@ body {
     .playerpage.is-classic .pp-coverbox { width: 0; }
     .pp-controls { max-width: 560px; margin: 0 auto; width: 100%; }
     .pp-play { width: 56px; height: 56px; }
+}
+
+/* ---------- liquidGL 真折射接管后的导航/迷你播放器 ----------
+   liquidGL 首帧渲染成功才给 <html> 加 .lg-on；此时关掉这两个元素自带的
+   毛玻璃背景与 backdrop 模糊，只留边线与阴影，玻璃本体由 WebGL 画。
+   没加 .lg-on（无 WebGL/快照失败）时什么都不变，继续用 .glass 配方兜底。 */
+html.lg-on .tabbar,
+html.lg-on .miniplayer {
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: rgba(255, 255, 255, 0.38);
 }
