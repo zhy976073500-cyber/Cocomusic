@@ -102,7 +102,8 @@ body {
        竖屏内容区本身只有约 350px，这个宽度看起来仍近乎全宽；
        横屏时就明显收成左上角一颗，不再横贯整个屏幕。 */
     width: min(360px, 100%);
-    margin: 16px 0 18px;
+    /* 搜索页已去掉「搜索」大标题（Sage 2026-10-27），胶囊直接顶在页面最上方 */
+    margin: 2px 0 18px;
     padding: 6px 6px 6px 15px;
     border-radius: 999px;
     will-change: width;
@@ -276,19 +277,14 @@ body {
     }
     .app.has-player .page { padding-bottom: 108px; }
 
-    /* 搜索框上移，与「搜索」标题同一行、贴在标题右侧（Sage 红框标注）。
-       用负 margin 把它从标题下方拉回标题行，仍保留 sticky 悬浮；
-       宽度同步补间，旋转时它从标题下方滑上标题右侧。 */
+    /* 标题已去掉（Sage 2026-10-27）：横屏胶囊直接落在左上角，
+       比竖屏略宽一点更好打字，仍保留 sticky 悬浮与宽度补间。 */
     .searchbar {
-        width: min(210px, calc(100% - 200px));
-        margin-top: -41px;
-        margin-left: 74px;
-        margin-bottom: 20px;
-        /* 横屏标题旁的版本要更小更细：压低内边距与按钮 */
-        padding: 4px 4px 4px 12px;
+        width: min(340px, calc(100% - 24px));
+        margin-top: 2px;
+        margin-left: 0;
+        margin-bottom: 16px;
     }
-    .searchbar .search-icon { width: 17px; height: 17px; }
-    .searchbar button { padding: 6px 13px; font-size: 14px; }
 
     .miniplayer {
         width: min(520px, calc(100vw - 150px));

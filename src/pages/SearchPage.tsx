@@ -34,8 +34,7 @@ export default function SearchPage() {
     }
 
     return (
-        <div className="page">
-            <h1>搜索</h1>
+        <div className="page page-search">
             <div className="searchbar glass">
                 <svg className="search-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                     <circle cx="11" cy="11" r="7" />
